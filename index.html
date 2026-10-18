@@ -76,4 +76,42 @@ $('downloadTemplate').addEventListener('click',()=>exportCSV('spx5m_candle_templ
 $('addNews').addEventListener('click',()=>{const t=$('newsTime').value,h=$('newsHeadline').value.trim();if(!t||!h){toast('Add an event time and headline first.');return}newsNotes.push({t:new Date(t).getTime(),type:$('newsType').value,bias:$('newsBias').value,headline:h});renderNews();$('newsHeadline').value='';toast('Event note saved in this page session.')});function renderNews(){if(!newsNotes.length){$('newsList').innerHTML='<div class="empty">No event notes saved in this session.</div>';return}$('newsList').innerHTML=newsNotes.slice().sort((a,b)=>b.t-a.t).map(n=>`<div class="newsitem"><b>${escapeHTML(n.headline)}</b><small>${new Date(n.t).toLocaleString()} · ${escapeHTML(n.type)} · label: ${escapeHTML(n.bias)}</small></div>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}$('exportNews').addEventListener('click',()=>{if(!newsNotes.length){toast('No notes to export.');return}exportCSV('spx15_news_event_notes.csv','timestamp,event_type,user_label,headline\n'+newsNotes.map(n=>[new Date(n.t).toISOString(),`"${n.type.replaceAll('"','""')}"`,n.bias,`"${n.headline.replaceAll('"','""')}"`].join(',')).join('\n'))});
 window.addEventListener('resize',()=>drawChart());
+async function loadLiveFeed() {
+  try {
+    const response = await fetch(
+      'https://spx-live-feed.ginne940.workers.dev/'
+    );
+
+    if (!response.ok) {
+      throw new Error('Feed unavailable');
+    }
+
+    const data = await response.json();
+
+    const candles = (data.values || [])
+      .map(c => ({
+        t: new Date(c.datetime.replace(' ', 'T') + 'Z').getTime(),
+        o: Number(c.open),
+        h: Number(c.high),
+        l: Number(c.low),
+        c: Number(c.close),
+        v: Number(c.volume)
+      }))
+      .reverse();
+
+    if (!candles.length) {
+      throw new Error('No candles received');
+    }
+
+    loadBars(candles, 'live');
+    runEverything();
+
+    console.log('Live SPY feed connected:', data.fetchedAt);
+  } catch (error) {
+    console.error('Live feed error:', error);
+  }
+}
+
+loadLiveFeed();
 </script></body></html>
+
